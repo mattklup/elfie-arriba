@@ -5,11 +5,12 @@ volumes:
 services:
   base:
     image: arriba-base
-    build: 
+    build:
       context: ./src
       dockerfile: Dockerfile
   crawler:
-    build: 
+    image: arriba-crawler
+    build:
       context: .docker/Crawler
       dockerfile: Dockerfile
     depends_on:
@@ -19,7 +20,8 @@ services:
     environment:
       ARRIBA__AZPAT: ${AZPAT}
   server:
-    build: 
+    image: arriba-server
+    build:
       context: .docker/Server
       dockerfile: Dockerfile
     depends_on:
@@ -29,7 +31,8 @@ services:
     environment:
       ARRIBASERVER__OAUTHCONFIG__APPSECRET: ${APPSECRET}
   web:
-    build: 
+    image: arriba-web
+    build:
       context: .docker/WebUI
       dockerfile: Dockerfile
     depends_on:
