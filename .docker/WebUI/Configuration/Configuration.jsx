@@ -6,7 +6,7 @@
         url: window.location.protocol + "//" + 
              window.location.hostname + 
              (window.location.port > 0 ? ":" + window.location.port : "" ) + 
-             "/data",
+             "/v1",
 
         // Name of tool to show [top right and elsewhere]
         toolName: "CSEng",

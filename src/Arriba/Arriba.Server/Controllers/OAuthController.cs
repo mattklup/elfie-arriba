@@ -1,4 +1,5 @@
 ﻿using Arriba.Configuration;
+using Arriba.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System;
@@ -6,7 +7,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace Arriba.Server.Controllers
+namespace Arriba.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
