@@ -18,6 +18,9 @@ services:
     volumes:
       - arriba:/Arriba/DiskCache
     environment:
+      ARRIBA__APPLICATIONVERSION: "DevMachine"
+      ARRIBA__SERVICENAME: "Crawler"
+      ARRIBA__APPINSIGHTS__INSTRUMENTATIONKEY: ${APPINSIGHTS}
       ARRIBA__AZPAT: ${AZPAT}
   server:
     image: ericmaino/elfie-arriba:server-latest
@@ -29,7 +32,10 @@ services:
     volumes:
       - arriba:/Arriba/DiskCache
     environment:
+      ARRIBASERVER__APPLICATIONVERSION: "DevMachine"
+      ARRIBASERVER__SERVICENAME: "Server"
       ARRIBASERVER__OAUTHCONFIG__APPSECRET: ${APPSECRET}
+      ARRIBASERVER__APPINSIGHTS__INSTRUMENTATIONKEY: ${APPINSIGHTS}
   web:
     image: ericmaino/elfie-arriba:web-latest
     build: 

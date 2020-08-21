@@ -22,13 +22,14 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="3.1.5" />
         <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-        <PackageReference Include="Newtonsoft.Json" Version="10.0.1" />
+        <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
         <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Adapters\Arriba.Adapter.Configuration\Arriba.Adapter.Configuration.csproj" />
         <ProjectReference Include="..\Adapters\Arriba.Adapter.Telemetry\Arriba.Adapter.Telemetry.csproj" />
         <ProjectReference Include="..\Arriba.Composition\Arriba.Composition.csproj" />
+        <ProjectReference Include="..\Arriba.Adapter.ApplicationInsights\Arriba.Adapter.ApplicationInsights.csproj" />
         <ProjectReference Include="..\Arriba\Arriba.csproj">
             <Project>{d89b4a01-f637-4147-9737-91a327a9da3f}</Project>
             <Name>Arriba</Name>
