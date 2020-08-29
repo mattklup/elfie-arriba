@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 
 using Arriba.Communication;
 using Arriba.Communication.Application;
-using Arriba.Communication.Server.Authorization;
+using Arriba.Server.Authorization;
+using Arriba.Configuration;
 using Arriba.Model;
 using Arriba.Model.Correctors;
 using Arriba.Model.Security;
@@ -22,20 +23,19 @@ namespace Arriba.Server
     public abstract class ArribaApplication : RoutedApplication<IResponse>
     {
         protected static readonly ArribaResponse ContinueToNextHandlerResponse = null;
-        private ClaimsAuthenticationService _claimsAuth;
         private ComposedCorrector _correctors;
         private IArribaAuthorization _arribaAuthorization;
 
-        protected ArribaApplication(DatabaseFactory factory, ClaimsAuthenticationService claimsAuth)
+        protected ArribaApplication(DatabaseFactory factory, ClaimsAuthenticationService claimsAuth, ISecurityConfiguration securityConfiguration)
         {
             ParamChecker.ThrowIfNull(factory, nameof(factory));
             ParamChecker.ThrowIfNull(claimsAuth, nameof(claimsAuth));
+            ParamChecker.ThrowIfNull(securityConfiguration, nameof(securityConfiguration));
 
             this.EventSource = EventPublisher.CreateEventSource(this.GetType().Name);
             this.Database = factory.GetDatabase();
-            _claimsAuth = claimsAuth;
 
-            _arribaAuthorization = new ArribaAuthorization(this.Database, claimsAuth);
+            _arribaAuthorization = new ArribaAuthorizationGrantDecorator(this.Database, claimsAuth, securityConfiguration);
 
             // Cache correctors which aren't request specific
             // Cache the People table so that it isn't reloaded for every request.
@@ -179,7 +179,7 @@ namespace Arriba.Server
 
         protected bool HasTableAccess(string tableName, IPrincipal currentUser, PermissionScope scope)
         {
-            return _arribaAuthorization.HasTableAccess(tableName, currentUser, scope);
+            return _arribaAuthorization.ValidateTableAccessForUser(tableName, currentUser, scope);
         }
 
 

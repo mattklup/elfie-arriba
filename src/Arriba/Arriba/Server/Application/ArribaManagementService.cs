@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Security.Principal;
-using Arriba.Communication.Server.Authorization;
+using Arriba.Server.Authorization;
+using Arriba.Configuration;
 using Arriba.Model;
 using Arriba.Model.Column;
 using Arriba.Model.Correctors;
@@ -19,10 +20,10 @@ namespace Arriba.Communication.Server.Application
         private readonly IArribaAuthorization _arribaAuthorization;
         private readonly ICorrector _correctors;
 
-        public ArribaManagementService(SecureDatabase secureDatabase, ICorrector composedCorrector, ClaimsAuthenticationService claims)
+        public ArribaManagementService(SecureDatabase secureDatabase, ICorrector composedCorrector, ClaimsAuthenticationService claims, ISecurityConfiguration securityConfiguration)
         {
             _database = secureDatabase;
-            _arribaAuthorization = new ArribaAuthorization(_database, claims);
+            _arribaAuthorization = new ArribaAuthorizationGrantDecorator(_database, claims, securityConfiguration);
             _correctors = composedCorrector;
         }
 
@@ -132,7 +133,7 @@ namespace Arriba.Communication.Server.Application
         {
             _database.ThrowIfTableNotFound(tableName);
 
-            if (!_arribaAuthorization.HasTableAccess(tableName, user, PermissionScope.Reader))
+            if (!_arribaAuthorization.ValidateTableAccessForUser(tableName, user, PermissionScope.Reader))
                 return null;
 
             var table = this._database[tableName];
@@ -145,8 +146,8 @@ namespace Arriba.Communication.Server.Application
             ti.PartitionCount = table.PartitionCount;
             ti.RowCount = table.Count;
             ti.LastWriteTimeUtc = table.LastWriteTimeUtc;
-            ti.CanWrite = _arribaAuthorization.HasTableAccess(tableName, user, PermissionScope.Writer);
-            ti.CanAdminister = _arribaAuthorization.HasTableAccess(tableName, user, PermissionScope.Owner);
+            ti.CanWrite = _arribaAuthorization.ValidateTableAccessForUser(tableName, user, PermissionScope.Writer);
+            ti.CanAdminister = _arribaAuthorization.ValidateTableAccessForUser(tableName, user, PermissionScope.Owner);
 
             IList<string> restrictedColumns = _database.GetRestrictedColumns(tableName, (si) => _arribaAuthorization.IsInIdentity(user, si));
             if (restrictedColumns == null)
@@ -176,7 +177,7 @@ namespace Arriba.Communication.Server.Application
             IDictionary<string, TableInformation> allBasics = new Dictionary<string, TableInformation>();
             foreach (string tableName in _database.TableNames)
             {
-                if (_arribaAuthorization.HasTableAccess(tableName, user, PermissionScope.Reader))
+                if (_arribaAuthorization.ValidateTableAccessForUser(tableName, user, PermissionScope.Reader))
                 {
                     allBasics[tableName] = GetTableInformationForUser(tableName, user);
                 }
@@ -266,7 +267,7 @@ namespace Arriba.Communication.Server.Application
         {
             _database.ThrowIfTableNotFound(tableName);
 
-            if (!_arribaAuthorization.HasTableAccess(tableName, user, PermissionScope.Writer))
+            if (!_arribaAuthorization.ValidateTableAccessForUser(tableName, user, PermissionScope.Writer))
                 return false;
 
             _database.UnloadTable(tableName);
