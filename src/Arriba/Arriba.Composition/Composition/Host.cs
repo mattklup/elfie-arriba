@@ -3,93 +3,71 @@
 
 using System;
 using System.Collections.Generic;
-using System.Composition.Convention;
-using System.Composition.Hosting;
+using System.Diagnostics;
 using System.Linq;
+using Arriba.Caching;
+using Arriba.Client.Serialization.Json;
 using Arriba.Communication;
+using Arriba.Communication.Application;
 using Arriba.Communication.ContentTypes;
+using Arriba.Communication.Server.Application;
+using Arriba.Configuration;
 using Arriba.Model;
+using Arriba.Model.Correctors;
+using Arriba.Serialization.Json;
+using Arriba.Server;
+using Arriba.Server.Application;
+using Arriba.Server.Authentication;
+using Arriba.Server.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace Arriba.Composition
 {
-    public class Host : IDisposable
+    public static class HostExtensions
     {
-        private CompositionHost _container = null;
-        private ContainerConfiguration _configuration = null;
-
-        public Host()
+        public static void AddArribaServices(this IServiceCollection services, ISecurityConfiguration config)
         {
-            ArribaServices.Initialize();
-            var conventions = new ConventionBuilder();
-            conventions.ForTypesDerivedFrom<IChannel>()
-                .ExportInterfaces()
-                .Shared();
+            services.AddSingleton<ISecurityConfiguration>(config);
+         
+            services.AddContentReadersWriters();
+            services.AddJsonConverters();
 
-            conventions.ForTypesDerivedFrom<IContentReader>()
-                .Export<IContentReader>()
-                .Shared();
+            services.AddSingleton<ClaimsAuthenticationService>();
+            services.AddSingleton<IArribaManagementService, ArribaManagementService>();
+            services.AddSingleton<IObjectCacheFactory, MemoryCacheFactory>();
+            services.AddSingleton<SecureDatabase>();
+            services.AddSingleton<DatabaseFactory>();
+            services.AddSingleton<ICorrector, TodayCorrector>();
 
-            conventions.ForTypesDerivedFrom<IContentWriter>()
-                .Export()
-                .Export<IContentWriter>()
-                .Shared();
+            services.AddTransient<IRoutedApplication, ArribaImportApplication>();
+            services.AddTransient<IRoutedApplication, ArribaQueryApplication>();
+            services.AddTransient<IRoutedApplication, ArribaTableRoutesApplication>();
 
-            conventions.ForTypesDerivedFrom<IApplication>()
-                .ExportInterfaces()
-                .Shared();
-
-            var assemblies = new[] {
-                // Arriba.dll
-                typeof(Table).Assembly, 
-                // Arriba.Composition.dll
-                typeof(Host).Assembly,
-                // Arriba.Adapter.Newtonsoft
-                typeof(JsonContentWriter).Assembly
-            };
-
-            _configuration = new ContainerConfiguration().WithAssemblies(assemblies.Distinct(), conventions);
-            Compose();
+            services.AddTransient<IApplication, RoutedApplicationHandler>();
+            services.AddSingleton<ApplicationServer, ComposedApplicationServer>();
         }
 
-        public void Compose()
+        private static void AddContentReadersWriters(this IServiceCollection services)
         {
-            _container = _configuration.CreateContainer();
+            services.AddTransient<IContentReader,StringContentReader>();
+            services.AddTransient<IContentReader, JsonContentReader>();
+            services.AddTransient<IContentWriter, StringContentWriter>();
+            services.AddTransient<IContentWriter, JsonContentWriter>();
+            services.AddTransient<IContentWriter, JsonpContentWriter>();
+
+            // Direct type requried by JsonPContentWriter
+            services.AddTransient<JsonContentWriter>();
         }
 
-        public void Add<TContract>(TContract value)
+        private static void AddJsonConverters(this IServiceCollection services)
         {
-            _configuration.WithExport<TContract>(value);
-        }
-
-        public void AddConfigurationValue<T>(string name, T value)
-        {
-            _configuration.WithExport<T>(value, contractName: name);
-        }
-
-        public T GetService<T>()
-        {
-            return _container.GetExport<T>();
-        }
-
-        public IEnumerable<T> GetServices<T>()
-        {
-            return _container.GetExports<T>();
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposing) return;
-
-            if (_container != null)
-            {
-                _container.Dispose();
-            }
+            services.AddTransient<JsonConverter,ColumnDetailsJsonConverter>();
+            services.AddTransient<JsonConverter, DataBlockJsonConverter>();
+            services.AddTransient<JsonConverter, IAggregatorJsonConverter>();
+            services.AddTransient<JsonConverter, IExpressionJsonConverter>();
+            services.AddTransient<JsonConverter, ValueJsonConverter>();
+            services.AddTransient<JsonConverter, ByteBlockJsonConverter>();
         }
     }
 }
