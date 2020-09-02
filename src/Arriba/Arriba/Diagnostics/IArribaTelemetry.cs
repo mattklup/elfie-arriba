@@ -11,6 +11,8 @@ namespace Arriba.Diagnostics.SemanticLogging
 
         void TrackInfo(string itemName, string itemValue);
 
+        void TrackInfo(string itemName, object itemValue);
+
         void TrackInfo(IDictionary<string, string> contextItems);
 
         void TrackException(Exception exception);

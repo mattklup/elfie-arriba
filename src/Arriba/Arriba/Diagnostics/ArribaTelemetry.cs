@@ -55,6 +55,12 @@ namespace Arriba.Diagnostics.SemanticLogging
             TrackInfo();
         }
 
+        public void TrackInfo(string itemName, object itemValue)
+        {
+            ProvideContext(itemName, JsonSerializer.Serialize(itemValue));
+            TrackInfo();
+        }
+
         public void TrackInfo(IDictionary<string, string>contextItems)
         {
             ProvideContext(contextItems);
