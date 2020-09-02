@@ -20,7 +20,7 @@ namespace Arriba.Composition
             IEnumerable<IContentReader> readers,
             IEnumerable<IContentWriter> writers,
             IEnumerable<IChannel> channels,
-            IArribaTelemetry telemetry) : base(telemetry)
+            IApplicationServerObservability telemetry) : base(telemetry)
         {
             if (!applications.Any())
             {

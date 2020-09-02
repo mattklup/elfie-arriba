@@ -30,7 +30,7 @@ namespace Arriba.Composition
         public static void AddArribaServices(this IServiceCollection services, ISecurityConfiguration config)
         {
             services.AddSingleton<ISecurityConfiguration>(config);
-         
+
             services.AddContentReadersWriters();
             services.AddJsonConverters();
 
@@ -47,7 +47,9 @@ namespace Arriba.Composition
 
             services.AddTransient<IApplication, RoutedApplicationHandler>();
             services.AddSingleton<ApplicationServer, ComposedApplicationServer>();
+
             services.AddTransient<IArribaTelemetry, ArribaTelemetry>();
+            services.AddTransient<IApplicationServerObservability, ApplicationServerObservability>();
         }
 
         private static void AddContentReadersWriters(this IServiceCollection services)

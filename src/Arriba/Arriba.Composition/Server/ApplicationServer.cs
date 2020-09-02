@@ -16,7 +16,7 @@ using Arriba.Monitoring;
 namespace Arriba.Communication
 {
     /// <summary>
-    /// Controller that ties together channels, applications, content reading and content writing. 
+    /// Controller that ties together channels, applications, content reading and content writing.
     /// </summary>
     public class ApplicationServer : IRequestHandler, IDisposable
     {
@@ -26,7 +26,7 @@ namespace Arriba.Communication
         private readonly ContentReaderWriterService _readerWriter = new ContentReaderWriterService();
 
         /// <summary>
-        /// Global cancellation source for shutting down the server. 
+        /// Global cancellation source for shutting down the server.
         /// </summary>
         private readonly CancellationTokenSource _cancellationSource = new CancellationTokenSource();
 
@@ -36,7 +36,7 @@ namespace Arriba.Communication
         private readonly List<IChannel> _channels = new List<IChannel>();
 
         /// <summary>
-        /// Applications to route requests to. 
+        /// Applications to route requests to.
         /// </summary>
         private readonly List<IApplication> _applications = new List<IApplication>();
 
@@ -50,7 +50,7 @@ namespace Arriba.Communication
         /// </summary>
         private Task[] _channelTasks = null;
 
-        private IArribaTelemetry tel;
+        private IApplicationServerObservability tel;
 
         private EventPublisherSource _eventSource = EventPublisher.CreateEventSource(new MonitorEventEntry() { Source = "Application", OpCode = MonitorEventOpCode.Mark });
 
@@ -59,19 +59,19 @@ namespace Arriba.Communication
         /// </summary>
         private static IResponse s_notFoundResponse = new Response(ResponseStatus.NotFound, "Resource not found");
 
-        public ApplicationServer(IArribaTelemetry telemetry)
+        public ApplicationServer(IApplicationServerObservability telemetry)
         {
             tel = telemetry;
         }
 
         /// <summary>
-        /// Registers the specified channel for the application. 
+        /// Registers the specified channel for the application.
         /// </summary>
         /// <param name="channel">I/O channel.</param>
         public void RegisterRequestChannel(IChannel channel)
         {
             _channels.Add(channel);
-            tel.TrackInfo("channel", channel.Description);
+            tel.RegisterChannel(channel.Description);
             //Trace.TraceInformation("Added application channel {0}", channel.Description);
         }
 
@@ -82,18 +82,19 @@ namespace Arriba.Communication
         public void RegisterApplication(IApplication application)
         {
             _applications.Add(application);
-
-            tel.TrackInfo("application", application.Name);
+            tel.RegisterApplication(application.Name);
+            //tel.TrackInfo("application", application.Name);
         }
 
         /// <summary>
-        /// Registers the specified content reader. 
+        /// Registers the specified content reader.
         /// </summary>
         /// <param name="reader">Reader to register.</param>
         public void RegisterContentReader(IContentReader reader)
         {
             _readerWriter.AddReader(reader);
-            tel.TrackInfo(new Dictionary<string, string> { { "ContentReaderWriterService", reader.GetType().Name }, { "contentTypes", String.Join(", ", reader.ContentTypes) } });
+            //tel.TrackInfo(new Dictionary<string, string> { { "ContentReaderWriterService", reader.GetType().Name }, { "contentTypes", String.Join(", ", reader.ContentTypes) } });
+            tel.RegisterContentReader(reader.GetType(), reader.ContentTypes);
         }
 
         /// <summary>
@@ -103,7 +104,8 @@ namespace Arriba.Communication
         public void RegisterContentWriter(IContentWriter writer)
         {
             _readerWriter.AddWriter(writer);
-            tel.TrackInfo(new Dictionary<string, string> { { "New content Writer", writer.GetType().Name }, { "contentType", writer.ContentType } });
+            //tel.TrackInfo(new Dictionary<string, string> { { "New content Writer", writer.GetType().Name }, { "contentType", writer.ContentType } });
+            tel.RegisterContentWriter(writer.GetType(), writer.ContentType);
         }
 
         public IContentReaderWriterService ReaderWriter
@@ -125,31 +127,26 @@ namespace Arriba.Communication
 
             if (_channels.Count == 0)
             {
-                var oEx = new InvalidOperationException("No application channels have been registered to the application server");
-                tel.TrackException(oEx);
-
-                throw oEx;
+                throw new InvalidOperationException("No application channels have been registered to the application server");
             }
             else if (_applications.Count == 0)
             {
-                var oEx = new InvalidOperationException("No applications have been registered with the application server");
-                tel.TrackException(oEx);
-
-                throw oEx;
+                throw new InvalidOperationException("No applications have been registered with the application server");
             }
 
             _isRunning = true;
 
             // Start all the channels
+            tel.Starting(_applications.Count, _channels.Count);
             _channelTasks = _channels.Select(s => s.StartAsync(this, _readerWriter, _cancellationSource.Token)).ToArray();
 
-            tel.TrackInfo(new Dictionary<string, string> { { "Running Apps", _applications.Count.ToString() }, { "Channel Count", _channels.Count.ToString() } });
-            
+            //tel.TrackInfo(new Dictionary<string, string> { { "Running Apps", _applications.Count.ToString() }, { "Channel Count", _channels.Count.ToString() } });
 
-            // Wait for all channels to complete (this will come from cancellation) 
+
+            // Wait for all channels to complete (this will come from cancellation)
             await Task.WhenAll(_channelTasks);
 
-            tel.TrackInfo("All channels shutdown");
+            //tel.TrackInfo("All channels shutdown");
         }
 
         /// <summary>
@@ -157,7 +154,8 @@ namespace Arriba.Communication
         /// </summary>
         public void Stop()
         {
-            tel.TrackInfo("Shutting down application server...");
+            //tel.TrackInfo("Shutting down application server...");
+            tel.Stopping();
             _cancellationSource.Cancel();
             Task.WaitAll(_channelTasks);
         }
@@ -181,7 +179,7 @@ namespace Arriba.Communication
                     request = new ModifiedVerbRequest(request, RequestVerb.Get);
                 }
 
-                // Try each application , if we get a handled response back, pass it back to the caller. 
+                // Try each application , if we get a handled response back, pass it back to the caller.
                 foreach (var application in _applications)
                 {
                     var response = await HandleApplicationRequestAsync(ctx, application);
@@ -199,7 +197,7 @@ namespace Arriba.Communication
             }
 
 
-            // No application processed this, return a not found result. 
+            // No application processed this, return a not found result.
             Trace.TraceWarning("Unknown request [{0}]", GetRequestIdentityString(ctx));
 
             return passThrough ? null : s_notFoundResponse;
@@ -216,7 +214,7 @@ namespace Arriba.Communication
             }
             catch (Exception e)
             {
-                tel.TrackException(e);
+                //tel.TrackException(e);
                 handleException = e;
             }
 
@@ -224,19 +222,19 @@ namespace Arriba.Communication
             {
                 string errorMessage = String.Format("Application \"{0}\" return a null response result");
 
-                tel.TrackInfo(errorMessage);
+                //tel.TrackInfo(errorMessage);
                 return Response.Error(errorMessage);
             }
             else if (handleException != null)
             {
-                tel.ProvideContext("Unexpected", handleException.GetType().Name);
-                tel.ProvideContext("Unexpected in Request", GetRequestIdentityString(request));
-                tel.TrackInfo("Unexpected exception", handleException.ToString());
+                //tel.ProvideContext("Unexpected", handleException.GetType().Name);
+                //tel.ProvideContext("Unexpected in Request", GetRequestIdentityString(request));
+                //tel.TrackInfo("Unexpected exception", handleException.ToString());
                 var resp = Response.Error(handleException);
 
                 resp.Headers.Add("Runtime-Unhandled-Exception", handleException.GetType().FullName);
 
-                // Log exception message 
+                // Log exception message
                 var detailObject = new { Request = request.Request.Resource, RequestParms = request.Request.ResourceParameters.ValuePairs, Exception = handleException };
 
                 _eventSource.Raise(MonitorEventLevel.Error,
@@ -262,7 +260,7 @@ namespace Arriba.Communication
             if (!_isRunning)
             {
                 var e =  new InvalidOperationException("Application server is running");
-                tel.TrackException(e);
+                //tel.TrackException(e);
 
                 throw e;
             }
@@ -273,7 +271,7 @@ namespace Arriba.Communication
             if (_isRunning)
             {
                 var e = new InvalidOperationException("Application server is not running");
-                tel.TrackException(e);
+                //tel.TrackException(e);
 
                 throw e;
             }
