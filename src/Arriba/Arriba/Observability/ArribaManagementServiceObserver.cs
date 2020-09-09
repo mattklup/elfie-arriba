@@ -23,16 +23,24 @@ namespace Arriba.Observability
 
         public SecureDatabase GetDatabaseForOwner(IPrincipal user)
         {
+            Log(nameof(GetDatabaseForOwner), new { UserName = user.Identity.Name });
+
             return _innerService.GetDatabaseForOwner(user);
         }
 
         public IEnumerable<string> GetTables()
         {
-            return _innerService.GetTables();
+            var tables = _innerService.GetTables();
+
+            Log(nameof(GetTables), new { Tables = tables });
+
+            return tables;
         }
 
         public IDictionary<string, TableInformation> GetTablesForUser(IPrincipal user)
         {
+            Log(nameof(GetTablesForUser), new { UserName = user.Identity.Name });
+
             return _innerService.GetTablesForUser(user);
         }
 
@@ -53,6 +61,8 @@ namespace Arriba.Observability
 
         public TableInformation CreateTableForUser(CreateTableRequest table, IPrincipal user)
         {
+            Log(nameof(CreateTableForUser), new { TableRequest = table, UserName = user.Identity.Name });
+
             return _innerService.CreateTableForUser(table, user);
         }
 
@@ -89,6 +99,11 @@ namespace Arriba.Observability
         public void RevokeAccessForUser(string tableName, SecurityIdentity securityIdentity, PermissionScope scope, IPrincipal user)
         {
             _innerService.RevokeAccessForUser(tableName, securityIdentity, scope, user);
+        }
+
+        private void Log<T>(string name, T payload)
+        {
+            _logger.WriteLine("LOGGER::{0}: {1}", name, ArribaConvert.ToJson(payload));
         }
     }
 }
