@@ -16,6 +16,7 @@ using Arriba.Configuration;
 using Arriba.Model;
 using Arriba.Model.Correctors;
 using Arriba.Monitoring;
+using Arriba.Observability;
 using Arriba.Serialization.Json;
 using Arriba.Server;
 using Arriba.Server.Application;
@@ -34,12 +35,12 @@ namespace Arriba.Composition
 
             services.AddSingleton<ArribaLog>();
             services.AddSingleton<ISecurityConfiguration>(config);
-         
+
             services.AddContentReadersWriters();
             services.AddJsonConverters();
+            services.AddArribaManagementService();
 
             services.AddSingleton<ClaimsAuthenticationService>();
-            services.AddSingleton<IArribaManagementService, ArribaManagementService>();
             services.AddSingleton<ITelemetry>((_) => new Telemetry(MonitorEventLevel.Verbose, "HTTP", null));
             services.AddSingleton<IArribaQueryServices, ArribaQueryServices>();
             services.AddSingleton<IObjectCacheFactory, MemoryCacheFactory>();
@@ -51,7 +52,7 @@ namespace Arriba.Composition
             services.AddTransient<IRoutedApplication, ArribaQueryApplication>();
             services.AddTransient<IRoutedApplication, ArribaTableRoutesApplication>();
 
-            services.AddTransient<IApplication, RoutedApplicationHandler>();
+            services.AddApplication();
             services.AddSingleton<ApplicationServer, ComposedApplicationServer>();
         }
 
@@ -75,6 +76,30 @@ namespace Arriba.Composition
             services.AddTransient<JsonConverter, IExpressionJsonConverter>();
             services.AddTransient<JsonConverter, ValueJsonConverter>();
             services.AddTransient<JsonConverter, ByteBlockJsonConverter>();
+        }
+
+        private static void AddArribaManagementService(this IServiceCollection services)
+        {
+            services.AddSingleton<ArribaManagementService>();
+            services.AddSingleton<IArribaManagementService>(
+                sp =>
+                {
+                    return new ArribaManagementServiceObserver(
+                        sp.GetRequiredService<ArribaLog>(),
+                        sp.GetRequiredService<ArribaManagementService>());
+                });
+        }
+
+        private static void AddApplication(this IServiceCollection services)
+        {
+            services.AddSingleton<RoutedApplicationHandler>();
+            services.AddSingleton<IApplication>(
+                sp =>
+                {
+                    return new ArribaApplicationObserver(
+                        sp.GetRequiredService<ArribaLog>(),
+                        sp.GetRequiredService<RoutedApplicationHandler>());
+                });
         }
     }
 }
